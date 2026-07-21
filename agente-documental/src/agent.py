@@ -1,6 +1,6 @@
 """
 agent.py
-Agente de preguntas y respuestas sobre el documento de Clínica Vitalis (vía Groq).
+Agente de preguntas y respuestas sobre el documento de Clínica Vitalis.
 """
 import os
 from dotenv import load_dotenv
@@ -31,15 +31,14 @@ Respuesta clara y concisa en español:"""
 
 
 def cargar_agente(index_path: str = INDEX_PATH):
-    # Usar embeddings libres compatibles para no requerir OpenAI
+    # Inicializar embeddings compatibles
     embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-    
     vector_store = FAISS.load_local(
         index_path, embeddings, allow_dangerous_deserialization=True
     )
     retriever = vector_store.as_retriever(search_kwargs={"k": 4})
 
-    # Configurar el modelo de Groq (Llama 3 o similar rápido y gratuito)
+    # Configurar el modelo con Groq
     llm = ChatGroq(model="llama-3.1-8b-instant", temperature=0)
 
     # Configurar el prompt
@@ -57,31 +56,3 @@ def cargar_agente(index_path: str = INDEX_PATH):
 def preguntar(qa_chain, pregunta: str) -> str:
     resultado = qa_chain.invoke({"input": pregunta})
     return resultado["answer"]
-
-
-def main():
-    print("Cargando agente de Clínica Vitalis con Groq... (Ctrl+C para salir)\n")
-    try:
-        qa_chain = cargar_agente()
-    except Exception as e:
-        print(f"Error al cargar el agente: {e}")
-        return
-
-    while True:
-        try:
-            pregunta = input("Pregunta: ").strip()
-            if not pregunta:
-                continue
-            
-            respuesta = preguntar(qa_chain, pregunta)
-            print(f"Respuesta: {respuesta}\n")
-            
-        except (KeyboardInterrupt, EOFError):
-            print("\nHasta luego.")
-            break
-        except Exception as e:
-            print(f"Ocurrió un error: {e}\n")
-
-
-if __name__ == "__main__":
-    main()
