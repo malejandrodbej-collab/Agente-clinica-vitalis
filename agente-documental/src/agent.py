@@ -1,23 +1,12 @@
 """
 agent.py
-Agente de preguntas y respuestas sobre el documento de Clínica Vitalis.
-
-Flujo:
-  1. Carga el índice vectorial construido por ingest.py.
-  2. Ante una pregunta, recupera los fragmentos del documento más
-     relevantes (retrieval).
-  3. Envía esos fragmentos + la pregunta al modelo de lenguaje, que
-     genera una respuesta en lenguaje natural basada únicamente en
-     ese contexto (generation) -> de ahí "RAG": Retrieval-Augmented
-     Generation.
-
-Ejecución interactiva por consola:
-    python src/agent.py
+Agente de preguntas y respuestas sobre el documento de Clínica Vitalis (vía Groq).
 """
 import os
 from dotenv import load_dotenv
 from langchain_community.vectorstores import FAISS
-from langchain_openai import OpenAIEmbeddings, ChatOpenAI
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_groq import ChatGroq
 from langchain.chains import create_retrieval_chain
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain.prompts import PromptTemplate
@@ -42,15 +31,16 @@ Respuesta clara y concisa en español:"""
 
 
 def cargar_agente(index_path: str = INDEX_PATH):
-    # Inicializar embeddings y cargar base de datos vectorial
-    embeddings = OpenAIEmbeddings()
+    # Usar embeddings libres compatibles para no requerir OpenAI
+    embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+    
     vector_store = FAISS.load_local(
         index_path, embeddings, allow_dangerous_deserialization=True
     )
     retriever = vector_store.as_retriever(search_kwargs={"k": 4})
 
-    # Configurar el modelo
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+    # Configurar el modelo de Groq (Llama 3 o similar rápido y gratuito)
+    llm = ChatGroq(model="llama-3.1-8b-instant", temperature=0)
 
     # Configurar el prompt
     prompt = PromptTemplate.from_template(PROMPT_TEMPLATE)
@@ -58,20 +48,19 @@ def cargar_agente(index_path: str = INDEX_PATH):
     # Crear cadena de combinación de documentos
     combine_docs_chain = create_stuff_documents_chain(llm, prompt)
 
-    # Crear cadena de recuperación (estándar actual en LangChain 0.3.x)
+    # Crear cadena de recuperación
     qa_chain = create_retrieval_chain(retriever, combine_docs_chain)
     
     return qa_chain
 
 
 def preguntar(qa_chain, pregunta: str) -> str:
-    # Invocar la cadena utilizando la clave 'input'
     resultado = qa_chain.invoke({"input": pregunta})
     return resultado["answer"]
 
 
 def main():
-    print("Cargando agente de Clínica Vitalis... (Ctrl+C para salir)\n")
+    print("Cargando agente de Clínica Vitalis con Groq... (Ctrl+C para salir)\n")
     try:
         qa_chain = cargar_agente()
     except Exception as e:
