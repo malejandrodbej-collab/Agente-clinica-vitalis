@@ -38,8 +38,9 @@ Respuesta directa y breve en español (solo el dato pedido):"""
 
 
 def cargar_agente(index_path: str = INDEX_PATH):
-    # Inicializar embeddings compatibles
-    embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+    # Inicializar embeddings compatibles (multilingüe: el índice y las consultas
+    # deben usar EXACTAMENTE el mismo modelo, aquí y en construir_indice.py)
+    embeddings = HuggingFaceEmbeddings(model_name="paraphrase-multilingual-MiniLM-L12-v2")
     vector_store = FAISS.load_local(
         index_path, embeddings, allow_dangerous_deserialization=True
     )
