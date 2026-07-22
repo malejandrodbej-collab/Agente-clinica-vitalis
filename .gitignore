@@ -1,0 +1,30 @@
+# Entorno virtual de Python
+.venv/
+venv/
+env/
+
+# Variables de entorno y claves
+.env
+
+# Cache de Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Streamlit
+.streamlit/
+
+# Base de datos vectorial / datos generados
+vector_store/
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
+
+# VS Code
+.vscode/
+agente-documental/.venv/
+agente-documental/.env
+agente-documental/src/__pycache__/
+agente-documental/.streamlit/
+agente-documental/vector_store/

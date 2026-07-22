@@ -16,18 +16,25 @@ load_dotenv()
 
 INDEX_PATH = os.path.join(os.path.dirname(__file__), "..", "vector_store")
 
-PROMPT_TEMPLATE = """Eres el asistente virtual de Clínica Vitalis. Responde la pregunta
+PROMPT_TEMPLATE = """Eres el asistente virtual de Clínica Vitalis. Respondes preguntas
 del usuario ÚNICAMENTE con base en el siguiente contexto extraído de la
 documentación interna. Si la respuesta no está en el contexto, indica
 claramente que no cuentas con esa información en los documentos disponibles.
 No inventes datos, horarios, porcentajes ni montos.
+
+Sé preciso y directo: responde exactamente lo que se pregunta, sin agregar
+datos relacionados que no se pidieron. Por ejemplo, si preguntan a qué hora
+abre la clínica, contesta solo la hora de apertura, no el horario completo
+de todos los días. Si el usuario necesita más detalle, lo puede pedir en una
+siguiente pregunta. Evita repetir el contexto completo o citarlo tal cual;
+extrae y resume únicamente el dato solicitado en una o dos oraciones.
 
 Contexto:
 {context}
 
 Pregunta: {input}
 
-Respuesta clara y concisa en español:"""
+Respuesta directa y breve en español (solo el dato pedido):"""
 
 
 def cargar_agente(index_path: str = INDEX_PATH):
@@ -36,7 +43,7 @@ def cargar_agente(index_path: str = INDEX_PATH):
     vector_store = FAISS.load_local(
         index_path, embeddings, allow_dangerous_deserialization=True
     )
-    retriever = vector_store.as_retriever(search_kwargs={"k": 4})
+    retriever = vector_store.as_retriever(search_kwargs={"k": 6})
 
     # Configurar el modelo con Groq
     llm = ChatGroq(model="llama-3.1-8b-instant", temperature=0)

@@ -36,7 +36,7 @@ El agente sigue un patrón **RAG (Retrieval-Augmented Generation)**:
                     │  División en           │
                     │  fragmentos (chunks)   │
                     └───────────┬───────────┘
-                                │  2. Embeddings (OpenAI)
+                                │  2. Embeddings (HuggingFace, local)
                                 ▼
                     ┌───────────────────────┐
                     │  Índice vectorial      │
@@ -46,7 +46,7 @@ El agente sigue un patrón **RAG (Retrieval-Augmented Generation)**:
    Pregunta del  ──────────────▶│
    usuario                      ▼
                     ┌───────────────────────┐
-                    │  LLM (gpt-4o-mini)     │
+                    │  LLM (Groq · Llama 3.1)│
                     │  + prompt con contexto │
                     └───────────┬───────────┘
                                 │  4. Generación
@@ -62,8 +62,8 @@ El agente sigue un patrón **RAG (Retrieval-Augmented Generation)**:
    fragmentos más relevantes del índice y se los pasa junto con la
    pregunta a un modelo de lenguaje, que responde solo con base en ese
    contexto (evita que el modelo invente datos).
-3. **Interfaz**: por ahora línea de comandos (consola), priorizando que
-   el agente funcione correctamente antes que la apariencia.
+3. **Interfaz** (`app.py`): interfaz web construida con Streamlit, con historial
+   de conversación tipo chat y preguntas de ejemplo.
 4. **Deploy**: la aplicación se ejecuta en una instancia de OCI Compute,
    accesible públicamente (ver sección de evidencia más abajo).
 
@@ -74,8 +74,10 @@ El agente sigue un patrón **RAG (Retrieval-Augmented Generation)**:
 | Lenguaje | Python 3.11 |
 | Orquestación del agente | LangChain |
 | Lectura de PDF | PyPDF (`PyPDFLoader`) |
-| Embeddings y modelo de lenguaje | OpenAI (`text-embedding-3-small`, `gpt-4o-mini`) |
+| Embeddings | HuggingFace `sentence-transformers` (`all-MiniLM-L6-v2`, local, sin costo) |
+| Modelo de lenguaje | Groq (`llama-3.1-8b-instant`) |
 | Índice vectorial | FAISS |
+| Interfaz | Streamlit |
 | Prototipado | Google Colab |
 | Despliegue | OCI Compute |
 
@@ -95,7 +97,7 @@ pip install -r requirements.txt
 
 ```bash
 cp .env.example .env
-# Editar .env y colocar tu OPENAI_API_KEY
+# Editar .env y colocar tu GROQ_API_KEY
 ```
 
 ### 3. Construir el índice vectorial (una sola vez)
@@ -107,10 +109,10 @@ python src/ingest.py
 ### 4. Ejecutar el agente
 
 ```bash
-python src/agent.py
+streamlit run app.py
 ```
 
-Esto abre un ciclo interactivo en consola donde se pueden escribir
+Esto abre la interfaz web en el navegador, donde se pueden escribir
 preguntas y el agente responde con base en el documento.
 
 ## Ejemplos de preguntas y respuestas
@@ -153,6 +155,9 @@ agente-documental-clinica-vitalis/
 ├── src/
 │   ├── ingest.py
 │   └── agent.py
+├── app.py
+├── .streamlit/
+│   └── config.toml
 ├── vector_store/          # generado automáticamente, no se sube a git
 ├── requirements.txt
 ├── .env.example
