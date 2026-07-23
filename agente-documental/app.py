@@ -3,9 +3,23 @@ app.py
 Interfaz web (Streamlit) para el agente documental de Clínica Vitalis.
 Envuelve las funciones de src/agent.py en un chat accesible desde el navegador.
 """
+import re
 import streamlit as st
 from langchain_core.messages import HumanMessage, AIMessage
 from src.agent import cargar_agente, preguntar
+
+# ──────────────────────────────────────────────────────────────────────────
+# Función auxiliar para sanear la respuesta (evita letras verdes en Streamlit)
+# ──────────────────────────────────────────────────────────────────────────
+def limpiar_respuesta(texto: str) -> str:
+    """Elimina comillas invertidas y formato residual para evitar que Streamlit
+    lo renderice como bloques o código en línea.
+    """
+    if not texto:
+        return ""
+    # Elimina comillas invertidas (backticks)
+    texto = texto.replace("`", "")
+    return texto.strip()
 
 # ──────────────────────────────────────────────────────────────────────────
 # Configuración de página
@@ -19,7 +33,6 @@ st.set_page_config(
 
 # ──────────────────────────────────────────────────────────────────────────
 # Estilos — paleta clínica seria, tipografía con un toque editorial
-# (sin cambios respecto a la versión original)
 # ──────────────────────────────────────────────────────────────────────────
 st.markdown(
     """
@@ -246,7 +259,6 @@ for mensaje in st.session_state["mensajes"]:
 # ──────────────────────────────────────────────────────────────────────────
 # Conversión del historial mostrado en pantalla al formato que espera
 # LangChain (HumanMessage / AIMessage), para el history-aware retriever.
-# Se limita a los últimos N turnos para no inflar el contexto sin necesidad.
 # ──────────────────────────────────────────────────────────────────────────
 MAX_TURNOS_HISTORIAL = 6  # ~6 pares pregunta/respuesta hacia atrás
 
@@ -258,7 +270,6 @@ def construir_historial_langchain(mensajes: list) -> list:
             historial.append(HumanMessage(content=m["content"]))
         elif m["role"] == "assistant":
             historial.append(AIMessage(content=m["content"]))
-    # nos quedamos solo con los últimos N*2 mensajes (N turnos completos)
     return historial[-(MAX_TURNOS_HISTORIAL * 2):]
 
 
@@ -268,9 +279,6 @@ pregunta_usuario = st.session_state.pop("pregunta_pendiente", None) or st.chat_i
 )
 
 if pregunta_usuario:
-    # Importante: el historial que se le pasa al agente se construye ANTES
-    # de agregar la pregunta actual a session_state, para que no se duplique
-    # (la pregunta actual va aparte, como "input").
     historial_previo = construir_historial_langchain(st.session_state["mensajes"])
 
     st.session_state["mensajes"].append({"role": "user", "content": pregunta_usuario})
@@ -280,7 +288,9 @@ if pregunta_usuario:
     with st.chat_message("assistant", avatar="🩺"):
         with st.spinner("Consultando la documentación…"):
             try:
-                respuesta = preguntar(qa_chain, pregunta_usuario, historial_previo)
+                respuesta_raw = preguntar(qa_chain, pregunta_usuario, historial_previo)
+                # ── LIMPIEZA DEL TEXTO AQUÍ ──
+                respuesta = limpiar_respuesta(respuesta_raw)
             except Exception as e:
                 respuesta = (
                     "Ocurrió un problema al procesar tu pregunta. "

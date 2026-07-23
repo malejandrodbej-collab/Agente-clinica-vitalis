@@ -24,7 +24,7 @@ PREGUNTAS_DE_PRUEBA = [
 
 
 def main():
-    embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+    embeddings = HuggingFaceEmbeddings(model_name="paraphrase-multilingual-MiniLM-L12-v2")
     vector_store = FAISS.load_local(
         INDEX_PATH, embeddings, allow_dangerous_deserialization=True
     )
