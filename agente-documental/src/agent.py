@@ -3,7 +3,6 @@ agent.py
 Agente de preguntas y respuestas sobre el documento de Clínica Vitalis.
 """
 import os
-import re
 from dotenv import load_dotenv
 from langchain_community.vectorstores import FAISS
 from langchain_huggingface import HuggingFaceEmbeddings
@@ -29,12 +28,6 @@ abre la clínica, contesta solo la hora de apertura, no el horario completo
 de todos los días. Si el usuario necesita más detalle, lo puede pedir en una
 siguiente pregunta. Evita repetir el contexto completo o citarlo tal cual;
 extrae y resume únicamente el dato solicitado en una o dos oraciones.
-
-Responde siempre en texto plano, sin usar Markdown: no uses backticks,
-asteriscos, guiones para listas, encabezados con '#', ni ningún otro
-símbolo de formato. Escribe los montos y datos exactamente como texto
-normal (ejemplo: 500.00 MXN), nunca entre comillas invertidas ni con
-énfasis especial.
 
 Contexto:
 {context}
@@ -68,22 +61,6 @@ def cargar_agente(index_path: str = INDEX_PATH):
     return qa_chain
 
 
-def _a_texto_plano(texto: str) -> str:
-    """Red de seguridad: elimina cualquier símbolo de Markdown que el LLM
-    haya podido colar en la respuesta (backticks, negritas, cursivas,
-    encabezados, viñetas), para que todo se muestre como texto plano y
-    del mismo color en la interfaz."""
-    limpio = texto
-    limpio = re.sub(r"`{1,3}([^`]*)`{1,3}", r"\1", limpio)   # `código` o ```bloque```
-    limpio = re.sub(r"\*\*([^*]+)\*\*", r"\1", limpio)        # **negrita**
-    limpio = re.sub(r"__([^_]+)__", r"\1", limpio)            # __negrita__
-    limpio = re.sub(r"(?<!\w)\*([^*\n]+)\*(?!\w)", r"\1", limpio)  # *cursiva*
-    limpio = re.sub(r"(?<!\w)_([^_\n]+)_(?!\w)", r"\1", limpio)    # _cursiva_
-    limpio = re.sub(r"^\s{0,3}#{1,6}\s*", "", limpio, flags=re.MULTILINE)  # # encabezados
-    limpio = re.sub(r"^\s{0,3}[-*+]\s+", "", limpio, flags=re.MULTILINE)   # - viñetas
-    return limpio.strip()
-
-
 def preguntar(qa_chain, pregunta: str) -> str:
     resultado = qa_chain.invoke({"input": pregunta})
-    return _a_texto_plano(resultado["answer"])
+    return resultado["answer"]
