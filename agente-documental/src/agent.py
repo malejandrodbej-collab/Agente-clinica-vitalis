@@ -19,10 +19,6 @@ INDEX_PATH = os.path.join(os.path.dirname(__file__), "..", "vector_store")
 
 # ──────────────────────────────────────────────────────────────────────────
 # Prompt para "reescribir" preguntas de seguimiento como preguntas autónomas
-# ANTES de buscar en el índice vectorial. Esto es lo que faltaba: sin esto,
-# una pregunta como "en orina?" se busca tal cual, aislada del historial,
-# y el retriever no tiene forma de saber que se refiere a "prueba de
-# embarazo en orina".
 # ──────────────────────────────────────────────────────────────────────────
 CONTEXTUALIZE_PROMPT = """Dado el historial de la conversación y la última pregunta del usuario,
 reformula la consulta para que sea una pregunta completa, autónoma e independiente,
@@ -62,12 +58,10 @@ REGLAS STRICTAS DE FORMATO (TEXTO PLANO):
 - Escribe ÚNICAMENTE en texto plano.
 - Queda PROHIBIDO usar sintaxis Markdown: NO uses comillas invertidas (backticks `), asteriscos (*),
   almohadillas (#), ni guiones de lista (-).
-- Escribe cifras y monedas como texto continuo común (ejemplo correcto: 500.00 MXN | ejemplo incorrecto: `500.00 MXN`)."""
+- Escribe cifras y monedas como texto continuo común (ejemplo correcto: 500.00 MXN | ejemplo incorrecto: `500.00 MXN`).
 
 Contexto:
-{context}
-
-Respuesta directa y breve en español (solo el dato pedido):"""
+{context}"""
 
 qa_prompt = ChatPromptTemplate.from_messages(
     [
@@ -79,34 +73,27 @@ qa_prompt = ChatPromptTemplate.from_messages(
 
 
 def cargar_agente(index_path: str = INDEX_PATH):
-    # Inicializar embeddings compatibles (multilingüe: el índice y las consultas
-    # deben usar EXACTAMENTE el mismo modelo, aquí y en construir_indice.py)
+    # Inicializar embeddings compatibles
     embeddings = HuggingFaceEmbeddings(model_name="paraphrase-multilingual-MiniLM-L12-v2")
+    
     vector_store = FAISS.load_local(
         index_path, embeddings, allow_dangerous_deserialization=True
     )
-    # k=8 en lugar de 6: da un poco más de margen de recall para preguntas
-    # cuyo phrasing no calza tan directo con el texto del documento (p. ej.
-    # "servicios de análisis laboratoriales" vs. cómo esté redactado en el PDF).
-    # Si sigue fallando en temas específicos, el siguiente paso es revisar
-    # construir_indice.py: tamaño de chunk / overlap.
+    
     retriever = vector_store.as_retriever(search_kwargs={"k": 8})
 
     # Configurar el modelo con Groq
     llm = ChatGroq(model="llama-3.1-8b-instant", temperature=0)
 
-    # 1) Retriever "consciente del historial": reformula la pregunta de
-    #    seguimiento en una pregunta autónoma antes de buscar en el índice.
+    # 1) Retriever consciente del historial
     history_aware_retriever = create_history_aware_retriever(
         llm, retriever, contextualize_q_prompt
     )
 
     # 2) Cadena que combina los documentos recuperados + historial + pregunta
-    #    para generar la respuesta final.
     combine_docs_chain = create_stuff_documents_chain(llm, qa_prompt)
 
-    # 3) Cadena de recuperación completa, ahora con el retriever consciente
-    #    del historial en vez del retriever "pelado" original.
+    # 3) Cadena de recuperación completa
     qa_chain = create_retrieval_chain(history_aware_retriever, combine_docs_chain)
 
     return qa_chain
@@ -114,9 +101,7 @@ def cargar_agente(index_path: str = INDEX_PATH):
 
 def _a_texto_plano(texto: str) -> str:
     """Red de seguridad: elimina cualquier símbolo de Markdown que el LLM
-    haya podido colar en la respuesta (backticks, negritas, cursivas,
-    encabezados, viñetas), para que todo se muestre como texto plano y
-    del mismo color en la interfaz."""
+    haya podido colar en la respuesta."""
     limpio = texto
     limpio = re.sub(r"`{1,3}([^`]*)`{1,3}", r"\1", limpio)   # `código` o ```bloque```
     limpio = re.sub(r"\*\*([^*]+)\*\*", r"\1", limpio)        # **negrita**
@@ -125,15 +110,13 @@ def _a_texto_plano(texto: str) -> str:
     limpio = re.sub(r"(?<!\w)_([^_\n]+)_(?!\w)", r"\1", limpio)    # _cursiva_
     limpio = re.sub(r"^\s{0,3}#{1,6}\s*", "", limpio, flags=re.MULTILINE)  # # encabezados
     limpio = re.sub(r"^\s{0,3}[-*+]\s+", "", limpio, flags=re.MULTILINE)   # - viñetas
+    limpio = limpio.replace("`", "")  # barrido final: backticks sueltos/no balanceados
     return limpio.strip()
 
 
 def preguntar(qa_chain, pregunta: str, chat_history: list | None = None) -> str:
     """
-    chat_history: lista de mensajes langchain_core (HumanMessage/AIMessage)
-    con los turnos previos de la conversación. Si no se pasa nada, se
-    comporta como antes (sin memoria), pero ya no es lo recomendado desde
-    app.py — ver construir_historial() allá.
+    Realiza una consulta a la cadena pasándole el historial de conversación opcional.
     """
     if chat_history is None:
         chat_history = []

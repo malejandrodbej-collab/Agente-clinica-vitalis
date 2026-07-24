@@ -1,11 +1,20 @@
 """
 ingest.py
+
+** OBSOLETO — usar construir_indice.py **
+Este script se mantiene solo por referencia. El script vigente para
+generar/regenerar el índice vectorial es construir_indice.py, que vive
+en la misma carpeta que agent.py y usa el mismo modelo de embeddings
+que este último carga en tiempo de consulta.
+
+Si ejecutas este script para regenerar vector_store/, el índice quedará
+construido con un modelo de embeddings distinto al que agent.py usa para
+vectorizar la pregunta del usuario, lo que degrada silenciosamente la
+calidad de la búsqueda (FAISS no lanza un error por esto, simplemente
+recupera fragmentos poco relevantes).
+
 Lee el documento fuente (PDF), lo divide en fragmentos manejables
 y construye un índice vectorial (FAISS) para búsqueda semántica.
-
-Este paso se ejecuta una sola vez (o cada vez que cambia el documento
-fuente) y guarda el índice en disco para que el agente lo reutilice
-sin tener que re-procesar el PDF en cada consulta.
 """
 
 import os
@@ -47,7 +56,9 @@ def dividir_en_fragmentos(paginas, chunk_size: int = 800, chunk_overlap: int = 1
 
 def construir_indice(fragmentos, index_path: str = INDEX_PATH):
     """Genera embeddings para cada fragmento y construye/guarda el índice FAISS."""
-    embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+    # Debe coincidir EXACTAMENTE con el modelo usado en agent.py, o las
+    # búsquedas de similitud quedarán descalibradas.
+    embeddings = HuggingFaceEmbeddings(model_name="paraphrase-multilingual-MiniLM-L12-v2")
     vector_store = FAISS.from_documents(fragmentos, embeddings)
     vector_store.save_local(index_path)
     print(f"Índice vectorial guardado en: {index_path}")

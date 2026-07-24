@@ -3,7 +3,6 @@ app.py
 Interfaz web (Streamlit) para el agente documental de Clínica Vitalis.
 Envuelve las funciones de src/agent.py en un chat accesible desde el navegador.
 """
-import re
 import streamlit as st
 from langchain_core.messages import HumanMessage, AIMessage
 from src.agent import cargar_agente, preguntar
