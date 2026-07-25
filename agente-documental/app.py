@@ -36,10 +36,17 @@ url_fondo = f"data:image/jpeg;base64,{img_b64}" if img_b64 else ""
 def limpiar_respuesta(texto: str) -> str:
     """Elimina comillas invertidas y formato residual para evitar que Streamlit
     lo renderice como bloques o código en línea.
+
+    Importante: también se escapan los signos "$" sueltos. Streamlit renderiza
+    st.markdown() con soporte de LaTeX, por lo que dos signos "$" en la misma
+    respuesta (ej. dos precios: "$500.00 MXN ... $250.00 MXN") hacen que todo
+    el texto entre ambos se interprete como una fórmula matemática y se
+    muestre en fuente monoespaciada/verde, en vez de texto plano.
     """
     if not texto:
         return ""
     texto = texto.replace("`", "")
+    texto = texto.replace("$", "\\$")  # evita que Streamlit lo tome como LaTeX
     return texto.strip()
 
 
@@ -54,7 +61,7 @@ st.set_page_config(
 )
 
 # ──────────────────────────────────────────────────────────────────────────
-# Estilos — paleta clínica seria, tipografía y fondo tenue
+# Estilos — paleta clínica seria, tipografía y fondo full-screen responsivo
 # ──────────────────────────────────────────────────────────────────────────
 st.markdown(
     f"""
@@ -81,11 +88,10 @@ st.markdown(
     }}
     div[data-testid="stDecoration"] {{ display: none; }}
 
-    .stApp {{
+    /* ─── FONDO TENUE EN TODA LA VENTANA (FULLSCREEN / RESPONSIVO) ─── */
+    [data-testid="stAppViewContainer"] {{
         font-family: 'Inter', sans-serif;
         color: var(--ink);
-        
-        /* ─── FONDO TENUE DESDE ASSETS/FONDO.JPEG ─── */
         background-image: linear-gradient(
             rgba(246, 247, 244, 0.88), 
             rgba(246, 247, 244, 0.88)
@@ -94,6 +100,28 @@ st.markdown(
         background-position: center;
         background-repeat: no-repeat;
         background-attachment: fixed;
+    }}
+
+    /* ─── TRANSPARENCIA Y FLUIDEZ EN PANELES ─── */
+    [data-testid="stMain"] {{
+        background: transparent;
+    }}
+
+    /* Quita el fondo blanco fijo de la barra de texto del chat */
+    [data-testid="stBottom"], [data-testid="stBottom"] > div {{
+        background: transparent !important;
+    }}
+
+    /* Sidebar traslúcido para integrarse al fondo */
+    section[data-testid="stSidebar"] {{
+        background: rgba(255, 255, 255, 0.82) !important;
+        backdrop-filter: blur(8px);
+        border-right: 1px solid var(--border);
+    }}
+    section[data-testid="stSidebar"] h3 {{
+        font-family: 'Fraunces', serif;
+        font-weight: 600;
+        color: var(--ink);
     }}
 
     .vitalis-header {{
@@ -135,7 +163,8 @@ st.markdown(
     .pulse-line svg {{ width: 100%; height: 100%; display: block; }}
 
     div[data-testid="stChatMessage"] {{
-        background: var(--surface);
+        background: rgba(255, 255, 255, 0.92);
+        backdrop-filter: blur(4px);
         border: 1px solid var(--border);
         border-radius: 12px;
         padding: 0.35rem 0.2rem;
@@ -152,15 +181,6 @@ st.markdown(
         margin-bottom: 1rem;
     }}
 
-    section[data-testid="stSidebar"] {{
-        background: var(--surface);
-        border-right: 1px solid var(--border);
-    }}
-    section[data-testid="stSidebar"] h3 {{
-        font-family: 'Fraunces', serif;
-        font-weight: 600;
-        color: var(--ink);
-    }}
     .sidebar-label {{
         font-family: 'IBM Plex Mono', monospace;
         font-size: 0.68rem;
@@ -218,7 +238,6 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
-
 # ──────────────────────────────────────────────────────────────────────────
 # Carga del agente (una sola vez por sesión de servidor)
 # ──────────────────────────────────────────────────────────────────────────

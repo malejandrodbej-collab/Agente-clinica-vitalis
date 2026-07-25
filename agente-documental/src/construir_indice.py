@@ -40,7 +40,7 @@ def construir_indice():
     documentos = loader.load()
     print(f"PDF cargado: {len(documentos)} página(s).")
 
-    splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=100)
+    splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=150)
     chunks = splitter.split_documents(documentos)
     print(f"Documento dividido en {len(chunks)} fragmentos.")
 

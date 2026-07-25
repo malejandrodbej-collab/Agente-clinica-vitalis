@@ -20,13 +20,14 @@ INDEX_PATH = os.path.join(os.path.dirname(__file__), "..", "vector_store")
 # ──────────────────────────────────────────────────────────────────────────
 # Prompt para "reescribir" preguntas de seguimiento como preguntas autónomas
 # ──────────────────────────────────────────────────────────────────────────
-CONTEXTUALIZE_PROMPT = """Eres un asistente especializado en reescribir consultas. 
-Dada una conversación previa y la última pregunta del usuario, tu ÚNICA tarea es devolver una pregunta autónoma y clara en español.
+CONTEXTUALIZE_PROMPT = """Eres un asistente especializado en reescribir consultas de búsqueda.
+Dada una conversación previa y la última pregunta del usuario, tu ÚNICA tarea es devolver una pregunta autónoma y clara en español para buscar en una base de datos vectorial.
 
-REGLAS:
-- Si la pregunta depende del contexto previo (ej. "¿cuánto cuesta?", "¿y para niños?"), reemplaza los pronombres por el servicio o tema específico mencionado antes.
-- Si la pregunta es un saludo ("hola"), despedida o ya es clara por sí misma, devuélvela exactamente igual.
-- NUNCA respondas la pregunta, no agregues explicaciones, ni uses formato Markdown. Deuelve solo la pregunta reformulada en una sola línea."""
+REGLAS CRÍTICAS:
+- Si el usuario pregunta por un NUEVO servicio, examen o tema (ej. pasa de hablar de 'TAC' a 'prueba de embarazo'), NO mezcles ni incluyas el servicio anterior. Limítate a pedir la información sobre el nuevo servicio (ej. '¿Cuál es el precio y requisitos de la prueba de embarazo?').
+- Si la pregunta usa pronombres de seguimiento que dependen del tema anterior (ej. "¿cuánto cuesta?", "¿requiere ayuno?", "¿y para niños?"), reemplaza los pronombres por el servicio específico mencionado justo antes.
+- Si la pregunta es un saludo, despedida o ya es clara por sí sola, devuélvela exactamente igual.
+- NUNCA respondas la pregunta, no agregues explicaciones, ni uses formato Markdown. Devuelve solo la pregunta reformulada en una sola línea."""
 
 contextualize_q_prompt = ChatPromptTemplate.from_messages(
     [
@@ -97,14 +98,18 @@ def _a_texto_plano(texto: str) -> str:
     """Red de seguridad: elimina cualquier símbolo de Markdown que el LLM
     haya podido colar en la respuesta."""
     limpio = texto
-    limpio = re.sub(r"`{1,3}([^`]*)`{1,3}", r"\1", limpio)   # `código` o ```bloque```
+    
+    # 1. Elimina todos los backticks directamente (adiós al texto verde/código)
+    limpio = limpio.replace("`", "")
+    
+    # 2. Elimina formato de negritas, cursivas, encabezados y listas
     limpio = re.sub(r"\*\*([^*]+)\*\*", r"\1", limpio)        # **negrita**
     limpio = re.sub(r"__([^_]+)__", r"\1", limpio)            # __negrita__
     limpio = re.sub(r"(?<!\w)\*([^*\n]+)\*(?!\w)", r"\1", limpio)  # *cursiva*
     limpio = re.sub(r"(?<!\w)_([^_\n]+)_(?!\w)", r"\1", limpio)    # _cursiva_
     limpio = re.sub(r"^\s{0,3}#{1,6}\s*", "", limpio, flags=re.MULTILINE)  # # encabezados
     limpio = re.sub(r"^\s{0,3}[-*+]\s+", "", limpio, flags=re.MULTILINE)   # - viñetas
-    limpio = limpio.replace("`", "")  # barrido final: backticks sueltos/no balanceados
+    
     return limpio.strip()
 
 
