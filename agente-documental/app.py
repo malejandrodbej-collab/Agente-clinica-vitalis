@@ -3,22 +3,45 @@ app.py
 Interfaz web (Streamlit) para el agente documental de Clínica Vitalis.
 Envuelve las funciones de src/agent.py en un chat accesible desde el navegador.
 """
+
+import base64
+import os
 import streamlit as st
-from langchain_core.messages import HumanMessage, AIMessage
+from langchain_core.messages import AIMessage, HumanMessage
 from src.agent import cargar_agente, preguntar
 
 # ──────────────────────────────────────────────────────────────────────────
-# Función auxiliar para sanear la respuesta (evita letras verdes en Streamlit)
+# Función auxiliar para cargar la imagen local en Base64
 # ──────────────────────────────────────────────────────────────────────────
+
+
+def obtener_base64_imagen(ruta_relativa: str) -> str:
+    """Lee una imagen local y la convierte a string Base64 para usarla en CSS."""
+    ruta_absoluta = os.path.join(os.path.dirname(__file__), ruta_relativa)
+    if os.path.exists(ruta_absoluta):
+        with open(ruta_absoluta, "rb") as f:
+            return base64.b64encode(f.read()).decode()
+    return ""
+
+
+# Cargar la imagen de fondo desde assets/fondo.jpeg
+img_b64 = obtener_base64_imagen("assets/fondo.jpeg")
+url_fondo = f"data:image/jpeg;base64,{img_b64}" if img_b64 else ""
+
+# ──────────────────────────────────────────────────────────────────────────
+# Función auxiliar para sanear la respuesta
+# ──────────────────────────────────────────────────────────────────────────
+
+
 def limpiar_respuesta(texto: str) -> str:
     """Elimina comillas invertidas y formato residual para evitar que Streamlit
     lo renderice como bloques o código en línea.
     """
     if not texto:
         return ""
-    # Elimina comillas invertidas (backticks)
     texto = texto.replace("`", "")
     return texto.strip()
+
 
 # ──────────────────────────────────────────────────────────────────────────
 # Configuración de página
@@ -31,14 +54,14 @@ st.set_page_config(
 )
 
 # ──────────────────────────────────────────────────────────────────────────
-# Estilos — paleta clínica seria, tipografía con un toque editorial
+# Estilos — paleta clínica seria, tipografía y fondo tenue
 # ──────────────────────────────────────────────────────────────────────────
 st.markdown(
-    """
+    f"""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap');
 
-    :root {
+    :root {{
         --bg: #F6F7F4;
         --surface: #FFFFFF;
         --ink: #1C2B2A;
@@ -49,29 +72,39 @@ st.markdown(
         --border: #E1E6E1;
         --alert-bg: #FBF3EC;
         --alert-border: #E7C9A9;
-    }
+    }}
 
-    #MainMenu, footer {visibility: hidden;}
-    header[data-testid="stHeader"] {
+    #MainMenu, footer {{ visibility: hidden; }}
+    header[data-testid="stHeader"] {{
         background: transparent;
         box-shadow: none;
-    }
-    div[data-testid="stDecoration"] {display: none;}
+    }}
+    div[data-testid="stDecoration"] {{ display: none; }}
 
-    .stApp {
+    .stApp {{
         font-family: 'Inter', sans-serif;
         color: var(--ink);
-    }
+        
+        /* ─── FONDO TENUE DESDE ASSETS/FONDO.JPEG ─── */
+        background-image: linear-gradient(
+            rgba(246, 247, 244, 0.88), 
+            rgba(246, 247, 244, 0.88)
+        ), url('{url_fondo}');
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+        background-attachment: fixed;
+    }}
 
-    .vitalis-header {
+    .vitalis-header {{
         display: flex;
         align-items: center;
         gap: 0.85rem;
         padding: 1.1rem 0 0.9rem 0;
         border-bottom: 1px solid var(--border);
         margin-bottom: 0.4rem;
-    }
-    .vitalis-mark {
+    }}
+    .vitalis-mark {{
         width: 42px;
         height: 42px;
         border-radius: 10px;
@@ -84,32 +117,32 @@ st.markdown(
         font-weight: 600;
         font-size: 1.15rem;
         flex-shrink: 0;
-    }
-    .vitalis-title {
+    }}
+    .vitalis-title {{
         font-family: 'Fraunces', serif;
         font-weight: 600;
         font-size: 1.35rem;
         color: var(--ink);
         line-height: 1.15;
-    }
-    .vitalis-subtitle {
+    }}
+    .vitalis-subtitle {{
         font-size: 0.82rem;
         color: var(--muted);
         margin-top: 0.1rem;
-    }
+    }}
 
-    .pulse-line { width: 100%; height: 22px; margin: 0.2rem 0 1.1rem 0; }
-    .pulse-line svg { width: 100%; height: 100%; display: block; }
+    .pulse-line {{ width: 100%; height: 22px; margin: 0.2rem 0 1.1rem 0; }}
+    .pulse-line svg {{ width: 100%; height: 100%; display: block; }}
 
-    div[data-testid="stChatMessage"] {
+    div[data-testid="stChatMessage"] {{
         background: var(--surface);
         border: 1px solid var(--border);
         border-radius: 12px;
         padding: 0.35rem 0.2rem;
         margin-bottom: 0.6rem;
-    }
+    }}
 
-    .scope-note {
+    .scope-note {{
         background: var(--alert-bg);
         border: 1px solid var(--alert-border);
         border-radius: 10px;
@@ -117,18 +150,18 @@ st.markdown(
         font-size: 0.82rem;
         color: var(--ink);
         margin-bottom: 1rem;
-    }
+    }}
 
-    section[data-testid="stSidebar"] {
+    section[data-testid="stSidebar"] {{
         background: var(--surface);
         border-right: 1px solid var(--border);
-    }
-    section[data-testid="stSidebar"] h3 {
+    }}
+    section[data-testid="stSidebar"] h3 {{
         font-family: 'Fraunces', serif;
         font-weight: 600;
         color: var(--ink);
-    }
-    .sidebar-label {
+    }}
+    .sidebar-label {{
         font-family: 'IBM Plex Mono', monospace;
         font-size: 0.68rem;
         letter-spacing: 0.06em;
@@ -136,9 +169,9 @@ st.markdown(
         color: var(--muted);
         margin-top: 1.1rem;
         margin-bottom: 0.35rem;
-    }
+    }}
 
-    .stButton button {
+    .stButton button {{
         background: var(--surface);
         border: 1px solid var(--border);
         color: var(--ink);
@@ -147,15 +180,15 @@ st.markdown(
         text-align: left;
         padding: 0.5rem 0.7rem;
         width: 100%;
-    }
-    .stButton button:hover {
+    }}
+    .stButton button:hover {{
         border-color: var(--primary);
         color: var(--primary);
-    }
+    }}
 
-    div[data-testid="stChatInput"] textarea {
+    div[data-testid="stChatInput"] textarea {{
         font-family: 'Inter', sans-serif;
-    }
+    }}
     </style>
 
     <div class="vitalis-header">
@@ -189,6 +222,8 @@ st.markdown(
 # ──────────────────────────────────────────────────────────────────────────
 # Carga del agente (una sola vez por sesión de servidor)
 # ──────────────────────────────────────────────────────────────────────────
+
+
 @st.cache_resource(show_spinner=False)
 def obtener_agente():
     return cargar_agente()
@@ -223,12 +258,24 @@ with st.sidebar:
         "la documentación interna de la clínica. Si algo no está en los "
         "documentos, el asistente lo indicará en lugar de inventar una respuesta."
     )
-    st.markdown('<div class="sidebar-label">Preguntas de ejemplo</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="sidebar-label">Preguntas de ejemplo</div>',
+        unsafe_allow_html=True,
+    )
+
     for pregunta in EJEMPLOS:
-        if st.button(pregunta, key=f"ejemplo_{pregunta}", disabled=not agente_disponible):
+        if st.button(
+            pregunta, key=f"ejemplo_{pregunta}", disabled=not agente_disponible
+        ):
             st.session_state["pregunta_pendiente"] = pregunta
-    st.markdown('<div class="sidebar-label">Nota</div>', unsafe_allow_html=True)
-    st.caption("Para urgencias médicas, contacta directamente a la clínica o a servicios de emergencia.")
+            st.rerun()
+
+    st.markdown(
+        '<div class="sidebar-label">Nota</div>', unsafe_allow_html=True
+    )
+    st.caption(
+        "Para urgencias médicas, contacta directamente a la clínica o a servicios de emergencia."
+    )
 
     if st.button("🗑️ Reiniciar conversación", disabled=not agente_disponible):
         st.session_state["mensajes"] = [
@@ -256,8 +303,7 @@ for mensaje in st.session_state["mensajes"]:
         st.markdown(mensaje["content"])
 
 # ──────────────────────────────────────────────────────────────────────────
-# Conversión del historial mostrado en pantalla al formato que espera
-# LangChain (HumanMessage / AIMessage), para el history-aware retriever.
+# Conversión del historial mostrado en pantalla a formato LangChain
 # ──────────────────────────────────────────────────────────────────────────
 MAX_TURNOS_HISTORIAL = 6  # ~6 pares pregunta/respuesta hacia atrás
 
@@ -269,26 +315,31 @@ def construir_historial_langchain(mensajes: list) -> list:
             historial.append(HumanMessage(content=m["content"]))
         elif m["role"] == "assistant":
             historial.append(AIMessage(content=m["content"]))
-    return historial[-(MAX_TURNOS_HISTORIAL * 2):]
+    return historial[-(MAX_TURNOS_HISTORIAL * 2) :]
 
 
 # Pregunta disparada desde el sidebar (si la hay) o desde el campo de texto
-pregunta_usuario = st.session_state.pop("pregunta_pendiente", None) or st.chat_input(
-    "Escribe tu pregunta…", disabled=not agente_disponible
-)
+pregunta_usuario = st.session_state.pop(
+    "pregunta_pendiente", None
+) or st.chat_input("Escribe tu pregunta…", disabled=not agente_disponible)
 
 if pregunta_usuario:
-    historial_previo = construir_historial_langchain(st.session_state["mensajes"])
+    historial_previo = construir_historial_langchain(
+        st.session_state["mensajes"]
+    )
 
-    st.session_state["mensajes"].append({"role": "user", "content": pregunta_usuario})
+    st.session_state["mensajes"].append(
+        {"role": "user", "content": pregunta_usuario}
+    )
     with st.chat_message("user", avatar="🧑"):
         st.markdown(pregunta_usuario)
 
     with st.chat_message("assistant", avatar="🩺"):
         with st.spinner("Consultando la documentación…"):
             try:
-                respuesta_raw = preguntar(qa_chain, pregunta_usuario, historial_previo)
-                # ── LIMPIEZA DEL TEXTO AQUÍ ──
+                respuesta_raw = preguntar(
+                    qa_chain, pregunta_usuario, historial_previo
+                )
                 respuesta = limpiar_respuesta(respuesta_raw)
             except Exception as e:
                 respuesta = (
@@ -297,4 +348,6 @@ if pregunta_usuario:
                 )
         st.markdown(respuesta)
 
-    st.session_state["mensajes"].append({"role": "assistant", "content": respuesta})
+    st.session_state["mensajes"].append(
+        {"role": "assistant", "content": respuesta}
+    )
