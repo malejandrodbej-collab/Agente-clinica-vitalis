@@ -46,7 +46,7 @@ def limpiar_respuesta(texto: str) -> str:
     if not texto:
         return ""
     texto = texto.replace("`", "")
-    texto = texto.replace("$", "\\$")  # evita que Streamlit lo tome como LaTeX
+    texto = texto.replace("$", "")  # evita que Streamlit lo tome como LaTeX
     return texto.strip()
 
 

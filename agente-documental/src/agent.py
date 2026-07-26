@@ -6,7 +6,7 @@ import os
 import re
 from dotenv import load_dotenv
 from langchain_community.vectorstores import FAISS
-from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_community.embeddings import FastEmbedEmbeddings
 from langchain_groq import ChatGroq
 from langchain.chains import create_retrieval_chain, create_history_aware_retriever
 from langchain.chains.combine_documents import create_stuff_documents_chain
@@ -68,8 +68,12 @@ qa_prompt = ChatPromptTemplate.from_messages(
 
 
 def cargar_agente(index_path: str = INDEX_PATH):
-    # Inicializar embeddings compatibles
-    embeddings = HuggingFaceEmbeddings(model_name="paraphrase-multilingual-MiniLM-L12-v2")
+    # Inicializar embeddings compatibles (FastEmbed usa ONNX Runtime en vez de
+    # PyTorch completo, lo que reduce muchísimo el consumo de RAM — clave
+    # para correr dentro de los 512 MB del plan Free de Render)
+    embeddings = FastEmbedEmbeddings(
+        model_name="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+    )
     
     vector_store = FAISS.load_local(
         index_path, embeddings, allow_dangerous_deserialization=True

@@ -11,7 +11,7 @@ import glob
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
-from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_community.embeddings import FastEmbedEmbeddings
 
 # Carpeta "data", un nivel arriba de este archivo (mismo patrón que vector_store)
 DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
@@ -45,7 +45,11 @@ def construir_indice():
     print(f"Documento dividido en {len(chunks)} fragmentos.")
 
     print("Generando embeddings (puede tardar un poco la primera vez)...")
-    embeddings = HuggingFaceEmbeddings(model_name="paraphrase-multilingual-MiniLM-L12-v2")
+    # IMPORTANTE: debe ser exactamente el mismo modelo y los mismos parámetros
+    # que en agent.py, o el índice quedará incompatible con las búsquedas.
+    embeddings = FastEmbedEmbeddings(
+        model_name="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+    )
 
     vector_store = FAISS.from_documents(chunks, embeddings)
     vector_store.save_local(INDEX_PATH)
