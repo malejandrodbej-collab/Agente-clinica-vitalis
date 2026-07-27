@@ -21,6 +21,12 @@ El documento fuente utilizado (`data/clinica_vitalis_documentacion.pdf`)
 consolida cinco políticas de una clínica de salud ficticia, elegido por
 su relación con mi formación en Tecnologías Biomédicas.
 
+El agente incluye salvaguardas de seguridad clínica: detecta síntomas de
+emergencia médica y redirige de inmediato a servicios de urgencias/911 en
+vez de intentar diagnosticar, y limita estrictamente su alcance a temas
+administrativos de la clínica (no da diagnósticos ni recomienda
+tratamientos o medicamentos).
+
 ## Arquitectura de la solución
 
 El agente sigue un patrón **RAG (Retrieval-Augmented Generation)**:
@@ -36,7 +42,7 @@ El agente sigue un patrón **RAG (Retrieval-Augmented Generation)**:
                     │  División en           │
                     │  fragmentos (chunks)   │
                     └───────────┬───────────┘
-                                │  2. Embeddings (HuggingFace, local)
+                                │  2. Embeddings (FastEmbed, local, ONNX)
                                 ▼
                     ┌───────────────────────┐
                     │  Índice vectorial      │
@@ -55,17 +61,20 @@ El agente sigue un patrón **RAG (Retrieval-Augmented Generation)**:
                         lenguaje natural
 ```
 
-1. **Ingesta** (`src/ingest.py`): lee el PDF, lo divide en fragmentos con
-   solapamiento (para no perder contexto entre secciones) y genera un
-   índice vectorial FAISS guardado en disco.
-2. **Agente** (`src/agent.py`): ante cada pregunta, recupera los
-   fragmentos más relevantes del índice y se los pasa junto con la
-   pregunta a un modelo de lenguaje, que responde solo con base en ese
-   contexto (evita que el modelo invente datos).
-3. **Interfaz** (`app.py`): interfaz web construida con Streamlit, con historial
-   de conversación tipo chat y preguntas de ejemplo.
-4. **Deploy**: la aplicación se ejecuta en una instancia de OCI Compute,
-   accesible públicamente (ver sección de evidencia más abajo).
+1. **Ingesta** (`src/construir_indice.py`): lee el PDF, lo divide en
+   fragmentos con solapamiento (`chunk_size=1000`, `chunk_overlap=150`,
+   para no perder contexto entre secciones) y genera un índice vectorial
+   FAISS guardado en disco.
+2. **Agente** (`src/agent.py`): ante cada pregunta, un *history-aware
+   retriever* reformula preguntas de seguimiento en preguntas autónomas,
+   recupera los fragmentos más relevantes del índice (k=8), y una cadena
+   de LangChain los combina con el historial de chat y un prompt de
+   sistema estricto para generar la respuesta — evitando que el modelo
+   invente datos fuera del documento fuente.
+3. **Interfaz** (`app.py`): interfaz web construida con Streamlit, con
+   historial de conversación tipo chat y preguntas de ejemplo.
+4. **Deploy**: la aplicación está desplegada en **Streamlit Community
+   Cloud**, accesible públicamente (ver sección de evidencia más abajo).
 
 ## Tecnologías utilizadas
 
@@ -74,12 +83,12 @@ El agente sigue un patrón **RAG (Retrieval-Augmented Generation)**:
 | Lenguaje | Python 3.11 |
 | Orquestación del agente | LangChain |
 | Lectura de PDF | PyPDF (`PyPDFLoader`) |
-| Embeddings | HuggingFace `sentence-transformers` (`all-MiniLM-L6-v2`, local, sin costo) |
+| Embeddings | FastEmbed (`paraphrase-multilingual-MiniLM-L12-v2`, ONNX Runtime, local, sin costo) |
 | Modelo de lenguaje | Groq (`llama-3.1-8b-instant`) |
 | Índice vectorial | FAISS |
 | Interfaz | Streamlit |
-| Prototipado | Google Colab |
-| Despliegue | OCI Compute |
+| Prototipado y pruebas | Google Colab |
+| Despliegue | Streamlit Community Cloud |
 
 ## Instrucciones para ejecutar el proyecto
 
@@ -93,6 +102,10 @@ source .venv/bin/activate        # En Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
+> Nota: el proyecto está probado y fijado para **Python 3.11**. Otras
+> versiones (especialmente 3.13+) pueden causar conflictos de
+> dependencias con `numpy`/`fastembed`.
+
 ### 2. Configurar la clave de API
 
 ```bash
@@ -103,7 +116,7 @@ cp .env.example .env
 ### 3. Construir el índice vectorial (una sola vez)
 
 ```bash
-python src/ingest.py
+python src/construir_indice.py
 ```
 
 ### 4. Ejecutar el agente
@@ -117,9 +130,7 @@ preguntas y el agente responde con base en el documento.
 
 ## Ejemplos de preguntas y respuestas
 
-> Las respuestas siguientes se muestran a modo de ejemplo del
-> comportamiento esperado del agente. *(Reemplazar con capturas o
-> salidas reales una vez ejecutado el agente.)*
+> Capturas reales de la aplicación en producción.
 
 **Pregunta:** ¿Cuánto tiempo antes debo llegar a mi cita?
 **Respuesta:** Se recomienda llegar 20 minutos antes de la hora
@@ -139,12 +150,26 @@ especialidades, y requiere autorización previa para especialidades.
 perfil lipídico o función hepática, en cuyo caso se requiere ayuno de
 8 horas.
 
-## Evidencia del deploy en OCI
+**Pregunta:** ¿Qué precio tienen las pruebas de embarazo?
+**Respuesta:** Las pruebas de embarazo que ofrecemos en Clínica Vitalis
+son: Prueba de Embarazo en Sangre (HCG cuantitativa): 500.00 MXN,
+Prueba de Embarazo en Orina (cualitativa): 250.00 MXN.
 
-*(Completar tras el despliegue.)*
+**Pregunta:** Me duele el pecho y tengo mucho dolor en el brazo.
+**Respuesta:** Si experimentas una emergencia médica, por favor acude
+inmediatamente al área de urgencias más cercana o llama al número local
+de emergencias (911).
 
-- Enlace público de la aplicación: `<pendiente>`
-- Captura de pantalla: `docs/screenshot-oci.png` *(agregar la imagen a esta ruta)*
+**Pregunta:** ¿Sabes quién ganó la copa mundial de fútbol 2026?
+**Respuesta:** Solo puedo ayudarte con información sobre los servicios
+y atención de Clínica Vitalis. ¿Necesitas ayuda con algo más?
+
+## Evidencia del deploy
+
+- **Enlace público de la aplicación:** `<pega aquí tu URL de Streamlit Cloud>`
+  (formato: `https://agente-clinica-vitalis-xxxxx.streamlit.app`)
+- **Capturas de pantalla:** `docs/screenshot-app.png` *(agregar imagen a esta ruta)*
+- **Repositorio de código:** este mismo repositorio
 
 ## Estructura del repositorio
 
@@ -153,13 +178,15 @@ agente-documental-clinica-vitalis/
 ├── data/
 │   └── clinica_vitalis_documentacion.pdf
 ├── src/
-│   ├── ingest.py
+│   ├── __init__.py
+│   ├── construir_indice.py
 │   └── agent.py
 ├── app.py
 ├── .streamlit/
 │   └── config.toml
-├── vector_store/          # generado automáticamente, no se sube a git
+├── vector_store/          # índice FAISS generado, incluido en git para el deploy
 ├── requirements.txt
+├── runtime.txt
 ├── .env.example
 ├── .gitignore
 └── README.md
