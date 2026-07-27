@@ -25,3 +25,6 @@ agente-documental/.venv/
 agente-documental/.env
 agente-documental/src/__pycache__/
 agente-documental/.streamlit/
+
+# Sistema windows
+desktop.ini
